@@ -364,23 +364,51 @@ $("reset").addEventListener("click", async () => {
 });
 
 // Voice input (Chrome/Edge/Safari expose SpeechRecognition; others fall back to typing)
+// One utterance per mic press, but it keeps listening through short pauses (people pause
+// mid-number: "odometer... 52,394"). It's sent after SILENCE_MS of quiet, or when the mic
+// is tapped again. We never re-arm on our own.
+const SILENCE_MS = 2000;
 const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 if (Recognition) {
   rec = new Recognition();
-  rec.lang = "en-US";
-  rec.continuous = false;     // one utterance per mic press; never re-arm on our own
-  rec.interimResults = false;
-  rec.onstart = () => { setState("listening"); $("mic").setAttribute("aria-pressed", "true"); };
-  rec.onend = () => { if (!busy) setState("idle"); $("mic").setAttribute("aria-pressed", "false"); };
-  rec.onresult = (e) => {
-    const heard = e.results[0][0].transcript;
-    if (busy || Date.now() < quietUntil || isEcho(heard)) return; // our own spoken reply, or a stale result
+  // The browser's language by default, so non-US English (and other languages) are heard
+  // as spoken; ?lang=en-GB etc. overrides it.
+  rec.lang = new URLSearchParams(location.search).get("lang") || navigator.language || "en-US";
+  rec.continuous = true;
+  rec.interimResults = true;
+  let listening = false;
+  let finals = [];    // the recognised (final) pieces of this utterance so far
+  let silenceTimer = 0;
+  const joined = (parts) => parts.join(" ").replace(/\s+/g, " ").trim();
+  rec.onstart = () => { listening = true; finals = []; setState("listening"); $("mic").setAttribute("aria-pressed", "true"); };
+  rec.onend = () => {
+    clearTimeout(silenceTimer);
+    listening = false;
+    $("mic").setAttribute("aria-pressed", "false");
+    const heard = joined(finals);
+    finals = [];
+    if (!heard || busy || Date.now() < quietUntil || isEcho(heard)) { // nothing said, our own spoken reply, or a stale result
+      if (!busy) { setState("idle"); $("heard").textContent = ""; }
+      return;
+    }
     say(heard);
   };
+  rec.onresult = (e) => {
+    clearTimeout(silenceTimer);
+    silenceTimer = setTimeout(() => { if (listening) rec.stop(); }, SILENCE_MS);
+    finals = [];
+    let interim = "";
+    for (let i = 0; i < e.results.length; i++) { // a SpeechRecognitionResultList isn't iterable everywhere
+      if (e.results[i].isFinal) finals.push(e.results[i][0].transcript);
+      else interim += e.results[i][0].transcript;
+    }
+    if (!busy) $("heard").textContent = joined([...finals, interim]); // show it as it's heard
+  };
   $("mic").addEventListener("click", () => {
+    if (listening) { rec.stop(); return; } // second tap: done talking, send it now
     speaker.cancel();
     quietUntil = 0;
-    try { rec.start(); } catch { /* already listening */ }
+    try { rec.start(); } catch { /* already starting */ }
   });
 } else {
   $("mic").disabled = true;

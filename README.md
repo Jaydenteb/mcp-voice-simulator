@@ -68,6 +68,12 @@ mcp-voice-simulator
 Open the printed `http://127.0.0.1:8790` URL. It links an account against
 your server, discovers its tools, and lets you type or speak utterances.
 
+To speak, tap the 🎤 (Chrome, Edge and Safari; other browsers can type). It
+keeps listening through short pauses and shows what it hears as you go; the
+utterance is sent after 2 seconds of quiet, or straight away if you tap the mic
+again. Recognition uses your browser's language; add `?lang=en-GB` (or any
+BCP 47 tag) to the page URL to pick another.
+
 Linking is done in your browser: the page shows a **Link account** button with
 a countdown (the URL is also printed in the terminal). If the login isn't
 finished in time, the page says so and offers **Try again**, which starts a
