@@ -13,7 +13,7 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 22.23.4
 
       # The peer-optional @anthropic-ai/sdk and @cursor/sdk are also
       # devDependencies (for typechecking), which trips a known npm/arborist
